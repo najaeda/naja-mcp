@@ -119,6 +119,34 @@ for leaf in leaves:
 
 ---
 
+## Building Block: Materialize and count API collections
+
+NajaEDA collection APIs such as `get_leaf_children()`,
+`get_input_bit_terms()`, and `get_output_bit_terms()` return iterables or
+generators. Materialize the requested collection before counting or retaining
+it as an analysis result:
+
+```python
+leaf_instances = list(top.get_leaf_children())
+leaf_count = len(leaf_instances)
+
+input_terms = list(top.get_input_bit_terms())
+input_count = len(input_terms)
+
+output_terms = list(top.get_output_bit_terms())
+output_count = len(output_terms)
+```
+
+Choose the collection from the requested metric; do not substitute a different
+term, net, or instance count merely because it is also available. When an
+integration contract requests named helper functions, include the complete
+`def` block for every helper the generated script calls, including transitive
+helpers. Skill snippets are documentation and are not imported into a generated
+script at runtime. A call such as `measure_metric(top)` is executable only when
+that same generated script defines `measure_metric`.
+
+---
+
 ## Pattern 3: Modify and reconnect
 
 ```python
