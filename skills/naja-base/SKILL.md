@@ -174,6 +174,9 @@ Navigation, statistics, transformation, export, utilities
     netlist.apply_dle()
     netlist.apply_constant_propagation()
     ```
+    If a request explicitly forbids a native transform, compose the reusable
+    truth-table, constant-source, and connectivity building blocks in
+    [common-steps.md](resources/common-steps.md) instead of restoring that call.
 
 13. **Export to Verilog**
     ```python

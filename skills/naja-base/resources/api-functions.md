@@ -349,8 +349,13 @@ inst.dump_verilog("output.v", config=config)    # with config
 inst.dump_full_dot("hierarchy.dot")              # full hierarchy DOT diagram
 inst.dump_context_dot("context.dot")             # context/flat DOT diagram
 
-truth_table = inst.get_truth_table()  # list[str] for combinatorial cells
+truth_table = inst.get_truth_table()  # list[int] or None
 ```
+
+The returned list is `[input_count, chunk0, chunk1, ...]`. Truth-table bits are
+packed into 64-bit chunks. Assignment `n` is bit `n % 64` of chunk `n // 64`,
+and input bit `i` is bit `i` of the assignment index. Prefer the output-specific
+`Term.get_truth_table()` for multi-output cells.
 
 **Export Methods:**
 - `dump_verilog(path, config=None)` - Export instance to Verilog (.v file)
@@ -490,13 +495,19 @@ count = term.count_attributes()
 
 ### Truth Table
 ```python
-truth_table = term.get_truth_table()  # list[str] for combinatorial gates
+truth_table = term.get_truth_table()  # list[int] or None
 ```
 
 **Notes:**
-- Only works for terms of combinatorial gate instances
-- Returns a list of output truth values as strings (e.g., ['0', '1', 'x'])
-- Useful for verifying gate logic or extracting function definition
+- Only output terms of combinatorial gate instances are valid; input terms raise
+  `ValueError`
+- Returns `None` when no truth table is modeled
+- Otherwise returns `[input_count, chunk0, chunk1, ...]`, where each chunk packs
+  64 output bits
+- Assignment `n` uses bit `n % 64` of chunk `n // 64`; input term index `i`
+  supplies assignment bit `i`
+- Wrap `get_input_bit_terms()` in `list()` and preserve its order when mapping
+  inputs to assignment bits
 
 ### Advanced (SNL Layer)
 ```python
@@ -568,9 +579,13 @@ In najaeda, a `najaeda.netlist.Net` can represent four scenarios:
 from najaeda.netlist import Net
 
 # Net.Type enum values
-Net.Type.SIGNAL        # Regular signal (default)
-Net.Type.POWER         # Power rail
-Net.Type.GROUND        # Ground rail
+Net.Type.STANDARD      # Regular signal (default)
+Net.Type.ASSIGN0       # Verilog constant assignment 0
+Net.Type.ASSIGN1       # Verilog constant assignment 1
+Net.Type.ASSIGNX       # Verilog constant assignment X
+Net.Type.ASSIGNZ       # Verilog constant assignment Z
+Net.Type.SUPPLY0       # Constant-zero supply net
+Net.Type.SUPPLY1       # Constant-one supply net
 ```
 
 ---
@@ -629,15 +644,21 @@ bit = net.get_bit(index)      # get bit at index
 ### Type Setting
 ```python
 # Set net type
-net.set_type(Net.Type.SIGNAL)    # Regular signal (default)
-net.set_type(Net.Type.POWER)     # Mark as power rail
-net.set_type(Net.Type.GROUND)    # Mark as ground rail
+net.set_type(Net.Type.STANDARD)  # Regular signal (default)
+net.set_type(Net.Type.ASSIGN0)   # Constant assignment 0
+net.set_type(Net.Type.ASSIGN1)   # Constant assignment 1
+net.set_type(Net.Type.ASSIGNX)   # Constant assignment X
+net.set_type(Net.Type.ASSIGNZ)   # Constant assignment Z
+net.set_type(Net.Type.SUPPLY0)   # Constant-zero supply
+net.set_type(Net.Type.SUPPLY1)   # Constant-one supply
 ```
 
 **Usage:**
-- `SIGNAL` (default) - Regular interconnect nets
-- `POWER` - Nets connected to power supply rails
-- `GROUND` - Nets connected to ground rails
+- `STANDARD` is a regular interconnect net
+- `ASSIGN0`, `ASSIGN1`, `ASSIGNX`, and `ASSIGNZ` represent Verilog assignment
+  constants
+- `SUPPLY0` and `SUPPLY1` represent constant supply nets and are appropriate
+  when a created `logic0` or `logic1` cell drives the net
 - Type information helps downstream tools understand power distribution
 
 ### Attributes

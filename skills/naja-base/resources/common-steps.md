@@ -163,6 +163,209 @@ Note: when the documentation asks for a lower-side operation or when you are man
 
 ---
 
+## Building Block: Packed truth-table evaluation
+
+Truth tables are useful for many Boolean analyses, including simulation,
+dependency checks, simplification, and pattern matching. The first list element
+is the input count; the remaining elements are packed 64-bit output chunks.
+
+```python
+def truth_value(truth_table, assignment):
+    chunk_index = 1 + assignment // 64
+    bit_index = assignment % 64
+    return (truth_table[chunk_index] >> bit_index) & 1
+
+
+def compatible_assignments(input_count, fixed_inputs):
+    unknown = [
+        index for index in range(input_count) if index not in fixed_inputs
+    ]
+    for unknown_assignment in range(1 << len(unknown)):
+        assignment = 0
+        for index, value in fixed_inputs.items():
+            assignment |= value << index
+        for offset, index in enumerate(unknown):
+            value = (unknown_assignment >> offset) & 1
+            assignment |= value << index
+        yield assignment
+```
+
+Use `output_term.get_truth_table()` only on scalar output terms. Preserve the
+order from `list(instance.get_input_bit_terms())`: input term index `i` is bit
+`i` of an assignment. A `None` truth table means the cell has no usable Boolean
+model.
+
+## Building Block: Known constant inputs
+
+Equipotential predicates identify constants independently of whether they came
+from a literal, assignment, supply net, or constant cell.
+
+```python
+def known_constant_inputs(input_terms):
+    fixed_inputs = {}
+    for index, input_term in enumerate(input_terms):
+        equipotential = input_term.get_equipotential()
+        if equipotential.is_const0():
+            fixed_inputs[index] = 0
+        elif equipotential.is_const1():
+            fixed_inputs[index] = 1
+    return fixed_inputs
+```
+
+This helper reports only known inputs. The calling algorithm decides how to use
+partial assignments and whether an observed property is strong enough to edit
+the design.
+
+## Building Block: Possible values under partial inputs
+
+Partial truth-table evaluation is a reusable analysis primitive for simulation,
+Boolean dependency analysis, observability, simplification, ECO planning, and
+repair. It reports every output value compatible with the inputs currently
+known to be constant, without deciding what an algorithm should do with that
+fact.
+
+```python
+def possible_output_values(output_term, fixed_inputs):
+    truth_table = output_term.get_truth_table()
+    if truth_table is None:
+        return None
+    input_count = truth_table[0]
+    return {
+        truth_value(truth_table, assignment)
+        for assignment in compatible_assignments(input_count, fixed_inputs)
+    }
+```
+
+To collect these facts across a flat combinational design, traverse instances
+and terms through their owning objects:
+
+```python
+def collect_modeled_output_facts(top):
+    facts = []
+    for instance in list(top.get_leaf_children()):
+        input_terms = list(instance.get_input_bit_terms())
+        fixed_inputs = known_constant_inputs(input_terms)
+        for output_term in list(instance.get_output_bit_terms()):
+            possible_values = possible_output_values(output_term, fixed_inputs)
+            if possible_values is not None:
+                facts.append((output_term, possible_values))
+    return facts
+```
+
+Each result is a two-item tuple `(output_term, possible_values)`, and
+`possible_values` is a `set`. Unpack the tuple directly. Sets are not
+subscriptable; when a consumer needs the sole value of a singleton set, use
+`next(iter(possible_values))` only after checking its length:
+
+```python
+for output_term, possible_values in collect_modeled_output_facts(top):
+    if len(possible_values) == 1:
+        sole_value = next(iter(possible_values))
+```
+
+The returned facts are analysis results, not edit instructions. A caller may
+use them for reporting, dependency checks, candidate selection, or a separately
+defined mutation policy.
+
+## Building Block: Constant sources and reader rewiring
+
+A fresh constant source needs a typed parent net and a `logic0` or `logic1`
+model from the loaded primitives or Liberty library. The caller supplies names
+so the same building block can be used by optimization, ECO, instrumentation,
+or repair algorithms.
+
+```python
+def create_constant_source(top, value, net_name, instance_name):
+    constant_net = top.create_net(net_name)
+    constant_net.set_type(
+        netlist.Net.Type.SUPPLY1 if value else netlist.Net.Type.SUPPLY0
+    )
+    driver = top.create_child_instance(
+        model=f"logic{value}",
+        name=instance_name,
+    )
+    driver_output = list(driver.get_output_bit_terms())[0]
+    driver_output.connect_upper_net(constant_net)
+    return constant_net
+
+
+def get_or_create_constant_source(
+    top,
+    value,
+    cache,
+    net_names,
+    instance_names,
+):
+    if value not in cache:
+        cache[value] = create_constant_source(
+            top,
+            value,
+            net_names[value],
+            instance_names[value],
+        )
+    return cache[value]
+
+
+def rewire_equipotential_readers(equipotential, target_net):
+    for reader in list(equipotential.get_leaf_readers()):
+        reader.disconnect_upper_net()
+        reader.connect_upper_net(target_net)
+    for reader in list(equipotential.get_top_readers()):
+        reader.disconnect_lower_net()
+        reader.connect_lower_net(target_net)
+```
+
+The caller owns and defines the cache and naming maps. For example:
+
+```python
+constant_sources = {}
+constant_net_names = {0: "logic0_naja_net", 1: "logic1_naja_net"}
+constant_instance_names = {0: "logic0_naja", 1: "logic1_naja"}
+
+target_net = get_or_create_constant_source(
+    top,
+    selected_value,
+    constant_sources,
+    constant_net_names,
+    constant_instance_names,
+)
+```
+
+The first argument to `rewire_equipotential_readers()` is an `Equipotential`,
+not a `Term`. For a selected output term, call it as follows:
+
+```python
+rewire_equipotential_readers(
+    output_term.get_equipotential(),
+    target_net,
+)
+```
+
+Collect edit candidates before rewiring. Do not mutate connectivity while
+iterating a live design generator. Reuse a constant source when multiple edits
+need the same value, and choose names that cannot collide with existing objects.
+Create a shared source lazily, after an edit candidate actually needs its value;
+do not add unused source cells or nets to the design. Keep the cache outside the
+candidate loop so all edits requesting the same value reuse one source.
+
+## Building Block: Compose analysis and mutation safely
+
+This control-flow pattern applies to optimizers, ECOs, instrumentation, repair,
+and other algorithms that derive edits from the current graph:
+
+1. Materialize traversal generators with `list()`.
+2. Analyze objects without changing connectivity.
+3. Store each decision and the exact object handles needed to apply it.
+4. Create shared resources once and cache them by purpose or value.
+5. Apply the collected edits only after analysis finishes.
+6. If edits can expose new candidates, repeat until one pass makes no changes.
+
+Do not replace a requested algorithm with a similarly named native transform
+when the request explicitly forbids that transform. Compose the documented
+building blocks and keep computation separate from graph mutation.
+
+---
+
 ## Pattern 4: Apply native transforms
 
 ```python
