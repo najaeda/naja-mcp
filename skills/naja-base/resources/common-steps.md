@@ -147,6 +147,75 @@ that same generated script defines `measure_metric`.
 
 ---
 
+## Building Block: Backward dependency cones
+
+Backward traversal from observable or otherwise important sink terms is a
+reusable primitive for fan-in reporting, design slicing, liveness analysis,
+observability analysis, and impact analysis. Follow each term's equipotential
+to its leaf drivers, retain each driver's owning instance, and continue from
+that instance's input terms:
+
+```python
+def collect_backward_leaf_instances(seed_terms):
+    retained_instances = set()
+    visited_term_keys = set()
+    pending_terms = list(seed_terms)
+
+    while pending_terms:
+        term = pending_terms.pop()
+        term_key = term.key()
+        if term_key in visited_term_keys:
+            continue
+        visited_term_keys.add(term_key)
+
+        equipotential = term.get_equipotential()
+        for driver_term in list(equipotential.get_leaf_drivers()):
+            driver_instance = driver_term.get_instance()
+            if driver_instance in retained_instances:
+                continue
+            retained_instances.add(driver_instance)
+            pending_terms.extend(list(driver_instance.get_input_bit_terms()))
+
+    return retained_instances
+```
+
+The caller chooses the seeds and therefore defines what is observable or
+important. Top-level outputs can be seeded with
+`list(top.get_output_bit_terms())`. Cells with no output terms can represent
+sinks or side effects; when a policy must preserve them, add their input terms
+to the seed list. This helper only computes a retained set and performs no edit.
+
+## Building Block: Snapshot-based object deletion
+
+Mutation invalidates live hierarchy iterators and object handles. First
+materialize the candidates and finish all analysis, then delete the chosen
+instances from that snapshot:
+
+```python
+def instances_with_output_terms(instances):
+    return [
+        instance
+        for instance in list(instances)
+        if list(instance.get_output_bit_terms())
+    ]
+
+
+def delete_instances(instances):
+    for instance in list(instances):
+        instance.delete()
+```
+
+`instances_with_output_terms()` is a structural classification helper, not a
+mutation policy; it is useful whenever an analysis needs to distinguish drivers
+from sink-only or side-effect cells. Deletion belongs to the `Instance` itself
+through `instance.delete()`. There is no `delete_instance()` method on an
+instance or its parent. Candidate selection is a separate policy: a caller can
+subtract a retained dependency cone from
+`list(top.get_leaf_children())`, filter by output terms or attributes, or apply
+another analysis before passing objects to this helper.
+
+---
+
 ## Pattern 3: Modify and reconnect
 
 ```python

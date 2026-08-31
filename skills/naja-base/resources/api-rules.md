@@ -30,7 +30,7 @@ Maintainers: update this single file; other documentation references it instead 
 
 - `Instance` owns hierarchy and design contents: `get_leaf_children()`,
   `get_input_bit_terms()`, `get_output_bit_terms()`, `get_net()`, `create_net()`,
-  and `create_child_instance()`.
+  `create_child_instance()`, and deletes itself with `delete()`.
 - `Term` owns port behavior and connectivity: `get_truth_table()`,
   `get_equipotential()`, `get_upper_net()`, `get_lower_net()`, and the explicit
   upper/lower connect and disconnect methods.
