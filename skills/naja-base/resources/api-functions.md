@@ -1038,6 +1038,8 @@ with open("design.stats", "w") as f:
 
 ## Part 12: Usage Pattern (Complete Script)
 
+<!-- example-purpose: standalone script | complete script | visitor | load libraries | load design -->
+
 ```python
 from pathlib import Path
 import logging

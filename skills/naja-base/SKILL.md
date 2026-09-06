@@ -8,6 +8,7 @@ description: Generate Python scripts for Naja EDA transformations and manipulati
 **Reference:** https://najaeda.readthedocs.io/en/latest  
 **Complete API Catalog:** [resources/api-functions.md](resources/api-functions.md)  
 **Patterns & Templates:** [resources/common-steps.md](resources/common-steps.md) | [resources/script-template.md](resources/script-template.md)  
+**Local Gate Rewrites:** [resources/gate-replacement.md](resources/gate-replacement.md)
 **Rules:** [resources/api-rules.md](resources/api-rules.md)
 
 ---
@@ -387,3 +388,17 @@ Open [resources/kepler-formal-mcp-tutorial.md](resources/kepler-formal-mcp-tutor
 **Last Updated:** May 2024  
 **Maintained Alongside:** Comprehensive API catalog, pattern library, templates  
 **For Full Details:** See [resources/api-functions.md](resources/api-functions.md) (Parts 1-15)
+
+## Select Examples by Purpose
+
+For a local gate-group replacement, use [gate-replacement.md](resources/gate-replacement.md).
+For constant analysis and propagation, use the relevant truth-table and
+constant-source building blocks in [common-steps.md](resources/common-steps.md).
+These examples are alternatives, not a cumulative script template. Include only
+behavior needed by the current edit and dependencies of helpers it actually calls.
+
+Sections can declare an `example-purpose` HTML comment containing pipe-separated
+purpose phrases. Context consumers can match these phrases in a request or an
+explicitly named helper defined in the section. Shared low-level API calls alone
+are insufficient to select an annotated example. Keep all code and helper
+dependencies together in its section. Untagged API reference remains available.

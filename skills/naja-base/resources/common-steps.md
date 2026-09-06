@@ -149,6 +149,8 @@ that same generated script defines `measure_metric`.
 
 ## Building Block: Backward dependency cones
 
+<!-- example-purpose: backward | fan in | liveness | observability | loadless | dead logic | dle | dependency cone -->
+
 Backward traversal from observable or otherwise important sink terms is a
 reusable primitive for fan-in reporting, design slicing, liveness analysis,
 observability analysis, and impact analysis. Follow each term's equipotential
@@ -262,6 +264,8 @@ Note: when the documentation asks for a lower-side operation or when you are man
 
 ## Building Block: Packed truth-table evaluation
 
+<!-- example-purpose: truth table | truth tables | constant propagation | boolean analysis | simulation | pattern matching -->
+
 Truth tables are useful for many Boolean analyses, including simulation,
 dependency checks, simplification, and pattern matching. The first list element
 is the input count; the remaining elements are packed 64-bit output chunks.
@@ -294,6 +298,8 @@ model.
 
 ## Building Block: Known constant inputs
 
+<!-- example-purpose: constant propagation | constant inputs | constant input | constant folding -->
+
 Equipotential predicates identify constants independently of whether they came
 from a literal, assignment, supply net, or constant cell.
 
@@ -314,6 +320,8 @@ partial assignments and whether an observed property is strong enough to edit
 the design.
 
 ## Building Block: Possible values under partial inputs
+
+<!-- example-purpose: constant propagation | partial inputs | possible values | truth table | constant folding -->
 
 Partial truth-table evaluation is a reusable analysis primitive for simulation,
 Boolean dependency analysis, observability, simplification, ECO planning, and
@@ -365,6 +373,8 @@ use them for reporting, dependency checks, candidate selection, or a separately
 defined mutation policy.
 
 ## Building Block: Constant sources and reader rewiring
+
+<!-- example-purpose: constant propagation | constant source | constant sources | constant folding | tie cell | tie cells | rewire readers -->
 
 A fresh constant source needs a typed parent net and a `logic0` or `logic1`
 model from the loaded primitives or Liberty library. The caller supplies names
