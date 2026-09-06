@@ -9,7 +9,10 @@ description: Generate Python scripts for Naja EDA transformations and manipulati
 **Complete API Catalog:** [resources/api-functions.md](resources/api-functions.md)  
 **Patterns & Templates:** [resources/common-steps.md](resources/common-steps.md) | [resources/script-template.md](resources/script-template.md)  
 **Local Gate Rewrites:** [resources/gate-replacement.md](resources/gate-replacement.md)
+**Constant Dataflow:** [resources/constant-dataflow.md](resources/constant-dataflow.md)
 **Rules:** [resources/api-rules.md](resources/api-rules.md)
+**Read-only Boolean Graph:** [resources/boolean-graph.md](resources/boolean-graph.md)
+**Deferred Constant Reader Edits:** [resources/constant-reader-edits.md](resources/constant-reader-edits.md)
 
 ---
 
@@ -392,8 +395,11 @@ Open [resources/kepler-formal-mcp-tutorial.md](resources/kepler-formal-mcp-tutor
 ## Select Examples by Purpose
 
 For a local gate-group replacement, use [gate-replacement.md](resources/gate-replacement.md).
-For constant analysis and propagation, use the relevant truth-table and
-constant-source building blocks in [common-steps.md](resources/common-steps.md).
+For complete constant propagation through multiple cells, read
+[constant-dataflow.md](resources/constant-dataflow.md) for occurrence identities,
+evolving facts, worklist convergence, and hierarchy-safe source reuse. Use the
+truth-table primitives in [common-steps.md](resources/common-steps.md) as needed;
+its single-pass collectors alone do not implement transitive propagation.
 These examples are alternatives, not a cumulative script template. Include only
 behavior needed by the current edit and dependencies of helpers it actually calls.
 

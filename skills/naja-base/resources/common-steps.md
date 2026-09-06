@@ -264,7 +264,7 @@ Note: when the documentation asks for a lower-side operation or when you are man
 
 ## Building Block: Packed truth-table evaluation
 
-<!-- example-purpose: truth table | truth tables | constant propagation | boolean analysis | simulation | pattern matching -->
+<!-- example-purpose: enumerate truth table | enumerate truth tables | packed truth query | boolean analysis | simulation | pattern matching -->
 
 Truth tables are useful for many Boolean analyses, including simulation,
 dependency checks, simplification, and pattern matching. The first list element
@@ -298,10 +298,12 @@ model.
 
 ## Building Block: Known constant inputs
 
-<!-- example-purpose: constant propagation | constant inputs | constant input | constant folding -->
+<!-- example-purpose: report typed constant inputs | query typed constant inputs | inspect constant input nets -->
 
-Equipotential predicates identify constants independently of whether they came
-from a literal, assignment, supply net, or constant cell.
+Equipotential predicates inspect typed connected nets, including binary literal
+and supply nets. They do not evaluate a constant-driving primitive whose output
+net is untyped. Collect such cell outputs through their modeled Boolean values
+as described in [constant-dataflow.md](constant-dataflow.md).
 
 ```python
 def known_constant_inputs(input_terms):
@@ -315,13 +317,15 @@ def known_constant_inputs(input_terms):
     return fixed_inputs
 ```
 
-This helper reports only known inputs. The calling algorithm decides how to use
-partial assignments and whether an observed property is strong enough to edit
-the design.
+This helper queries only the original net types; it cannot see constants newly
+inferred in a separate fact map. During fixed-point propagation, read input
+values from the evolving signal facts instead. Check conflicting or ambiguous
+drivers before trusting a typed seed. See
+[constant-dataflow.md](constant-dataflow.md) for that analysis contract.
 
 ## Building Block: Possible values under partial inputs
 
-<!-- example-purpose: constant propagation | partial inputs | possible values | truth table | constant folding -->
+<!-- example-purpose: report possible values | simulate partial inputs | partial truth query -->
 
 Partial truth-table evaluation is a reusable analysis primitive for simulation,
 Boolean dependency analysis, observability, simplification, ECO planning, and
@@ -343,7 +347,7 @@ def possible_output_values(output_term, fixed_inputs):
 
 ## Building Block: Prove an invariant output value
 
-<!-- example-purpose: constant propagation | constant folding | invariant output | prove a constant -->
+<!-- example-purpose: report invariant outputs | report constant outputs | single-pass Boolean analysis | invariant output query | prove a constant -->
 
 A modeled output is not necessarily constant. A nonempty set can contain both
 0 and 1. Only a singleton set proves invariance over every compatible input
@@ -391,6 +395,8 @@ Unpack each result as `(output_term, value)`. Here `value` is already a proved
 integer 0 or 1, not a set, and can be passed to a constant-source building
 block. This is a snapshot of facts, not a complete propagation algorithm:
 the caller still chooses the mutation policy, iteration, and termination.
+For transitive propagation with deferred edits, use an evolving signal fact map
+and worklist as described in [constant-dataflow.md](constant-dataflow.md).
 Do not mutate the design during the collector's analysis traversal.
 
 ## Building Block: Collect modeled output facts
@@ -432,7 +438,7 @@ defined mutation policy.
 
 ## Building Block: Constant sources and reader rewiring
 
-<!-- example-purpose: constant propagation | constant source | constant sources | constant folding | tie cell | tie cells | rewire readers -->
+<!-- example-purpose: create constant source | create constant sources | create tie cell | create tie cells | local source wiring -->
 
 A fresh constant source needs a typed parent net and a `logic0` or `logic1`
 model from the loaded primitives or Liberty library. The caller supplies names
@@ -495,6 +501,11 @@ target_net = get_or_create_constant_source(
     constant_instance_names,
 )
 ```
+
+This helper assumes a flat, input/output-only design where all readers share
+the target net's owning context. For hierarchy, bidirectional pins, existing
+sources, and repeated invocations, follow
+[constant-dataflow.md](constant-dataflow.md) instead.
 
 The first argument to `rewire_equipotential_readers()` is an `Equipotential`,
 not a `Term`. For a selected output term, call it as follows:
