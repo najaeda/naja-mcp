@@ -341,8 +341,66 @@ def possible_output_values(output_term, fixed_inputs):
     }
 ```
 
-To collect these facts across a flat combinational design, traverse instances
-and terms through their owning objects:
+## Building Block: Prove an invariant output value
+
+<!-- example-purpose: constant propagation | constant folding | invariant output | prove a constant -->
+
+A modeled output is not necessarily constant. A nonempty set can contain both
+0 and 1. Only a singleton set proves invariance over every compatible input
+assignment. The following query returns 0 or 1 only after that proof, and None
+for a variable or unmodeled output:
+
+```python
+def invariant_output_value(output_term, fixed_inputs):
+    values = possible_output_values(output_term, fixed_inputs)
+    if values is None or len(values) != 1:
+        return None
+    return next(iter(values))
+```
+
+An editing algorithm may create a constant source and rewire readers only when
+this query returns a value other than None. Test `value is not None`, not
+`if value`: zero is a valid proved constant. A result of None leaves that output
+and all its readers unchanged. Neither a usable truth table nor the existence
+of known constant inputs alone justifies a rewrite.
+
+For example, with one input fixed at zero, an OR gate still depends on its
+other, unknown input: possible values are {0, 1}, so the invariant query returns
+None. An AND gate with one input fixed at zero returns 0. The query itself
+performs no mutation and does not implement a complete optimization algorithm.
+
+For a flat combinational design, query each leaf cell's outputs using that
+same cell's ordered input terms, not the top-level ports. This read-only
+collector returns only proved constants; variable and unmodeled outputs are
+excluded before any consumer can select them for mutation:
+
+```python
+def collect_invariant_output_facts(top):
+    facts = []
+    for instance in list(top.get_leaf_children()):
+        input_terms = list(instance.get_input_bit_terms())
+        fixed_inputs = known_constant_inputs(input_terms)
+        for output_term in list(instance.get_output_bit_terms()):
+            value = invariant_output_value(output_term, fixed_inputs)
+            if value is not None:
+                facts.append((output_term, value))
+    return facts
+```
+
+Unpack each result as `(output_term, value)`. Here `value` is already a proved
+integer 0 or 1, not a set, and can be passed to a constant-source building
+block. This is a snapshot of facts, not a complete propagation algorithm:
+the caller still chooses the mutation policy, iteration, and termination.
+Do not mutate the design during the collector's analysis traversal.
+
+## Building Block: Collect modeled output facts
+
+<!-- example-purpose: output facts | report possible values | boolean analysis | model inspection | observability -->
+
+This is an analysis-only example. Its results include variable outputs;
+`possible_values is not None` means modeled, not proved constant. To collect
+these facts across a flat combinational design, traverse instances and terms
+through their owning objects:
 
 ```python
 def collect_modeled_output_facts(top):
